@@ -25,13 +25,6 @@ License: MIT (see `LICENSE`).
 
 Full revision hashes and the softmax index that each publisher designates as "AI-generated" are in `text_detector.py` (`HF_DETECTORS`) and in S5 Table. Three checkpoints (RoBERTa-large, RADAR, e5-small-lora) do not name their labels in `config.json`; the conventions come from the publishers' reference code (OpenAI `detector/server.py`: `fake, real = probs`; RADAR Space `app.py`: softmax index 0 = AI) or model card (e5: `Label_1` = AI).
 
-## Corrections in this version (R5)
-
-* **Hello-SimpleAI label lookup.** The previous `text_detector.py` read the Hello-SimpleAI score under `"LABEL_1"`, but the checkpoint's `config.json` names its labels `"Human"`/`"ChatGPT"`; that lookup returned 0 for every text. The study's runs did not use that code path: they used the pipeline label directly (the `else` branch of the original wrapper, reproduced in `score_local_detectors.py --mode original`). Re-running that wrapper reproduces 2,064 of the 2,078 published ICNALE labels and all 1,481 commonly scored Blog labels (S7 Table). The wrapper is fixed.
-* **Inputs longer than 512 tokens.** The 2025 wrapper truncated at `max_position_embeddings` (514), decoded, and re-tokenised without truncation, so any text of more than 512 tokens raised an error and was skipped. This removed 2 ICNALE essays and 519 Blog posts from the open-source results. All locally run detectors are now scored on every text with a single 512-token truncation.
-* **Excluded detectors.** `rerun_excluded_detectors.py` (August 2026) covered ICNALE only; `score_local_detectors.py` now runs all locally run detectors on all corpora.
-* **Corpus sampling defaults.** `run_detectors_on_arxiv.py` previously defaulted to 200 abstracts per field with a 1,500-character minimum, and `run_detectors_on_blogs.py` to balancing by gender and age with a 200-character minimum. Neither matched the study. The study used 90 abstracts per field with no minimum length (GPTZero on all 990; ZeroGPT, Originality.AI and the 2025 Hello-SimpleAI/Fakespot runs on the first 45 per field), and 2,000 blog posts longer than 500 characters, 1,000 per gender (age not balanced). The defaults and docstrings now say so, and the exact samples are identified in `outputs/`.
-
 ## Layout
 
 ```
