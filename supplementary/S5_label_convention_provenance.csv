@@ -1,0 +1,7 @@
+detector,id2label_in_config,convention_in_model_card,convention_specified_in,screening_interpretation_correct,repository_revision,accessed
+Hello-SimpleAI/chatgpt-detector-roberta,"Present: {0: Human, 1: ChatGPT}",Not required,config.json (id2label),Yes,d2b342c61775,2026-08-07
+fakespot-ai/roberta-base-ai-text-detection-v1,"Present: {0: Human, 1: AI}",Not required,config.json (id2label),Yes,f9cdb14d1f8b,2026-08-07
+MayZhou/e5-small-lora-ai-generated-detector,Absent,"Documented: ""Label_0: human-written; Label_1: AI-generated""",Model card,Yes,483fc4969592,2026-08-07
+openai-community/roberta-large-openai-detector,Absent,Not documented,"External source code: gpt-2-output-dataset/detector/server.py (""fake, real = probs"")",No (inverted),38f3e0ccf205,2026-08-07
+TrustSafeAI/RADAR-Vicuna-7B,Absent,Not documented,External source code: HF Space RADAR-AI-Text-Detector/app.py (softmax index 0 = AI),No (inverted),4ff1f23a69a3,2026-08-07
+Binoculars,Not applicable (threshold on perplexity ratio),Not applicable,Package default threshold,Not evaluated,n/a,2026-08-07

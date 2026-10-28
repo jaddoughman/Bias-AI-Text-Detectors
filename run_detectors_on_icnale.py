@@ -38,7 +38,8 @@ COUNTRY_CODES = {
     "VNM": "Vietnam",
 }
 
-# Detectors used in the paper. Default omits GPTZero (paid API).
+# Six retained detectors used in the paper. Default omits Quillbot (Selenium)
+# and GPTZero (paid API).
 DEFAULT_DETECTORS = [
     "www.originality.ai",
     "www.zerogpt.com",

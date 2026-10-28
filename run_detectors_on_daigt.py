@@ -32,8 +32,8 @@ DEFAULT_GENERATORS = [
     "kingki19_palm",
 ]
 
-# GPTZero omitted from default for the same reasons as the
-# human-corpus scripts. Add it via --detectors if you have credentials.
+# Quillbot/GPTZero omitted from default for the same reasons as the
+# human-corpus scripts. Add them via --detectors if you have credentials.
 DEFAULT_DETECTORS = [
     "www.originality.ai",
     "Hello-SimpleAI/chatgpt-detector-roberta",

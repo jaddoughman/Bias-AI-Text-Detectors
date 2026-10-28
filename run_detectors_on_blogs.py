@@ -11,7 +11,13 @@ Example:
   python run_detectors_on_blogs.py \\
       --input  blogtext.csv \\
       --output results/blogs.csv \\
-      --sample 2000 --balance-by gender age_group
+      --sample 2000 --balance-by gender --min-chars 501
+
+The published study used 2,000 posts longer than 500 characters, 1,000 per gender,
+drawn at random within gender (age follows the corpus distribution; it was not
+balanced). The exact sample (post texts with gender and age) is in
+outputs/blog_outputs.csv; to re-score it, use score_local_detectors.py on those texts
+rather than re-sampling.
 """
 
 import argparse
@@ -56,7 +62,7 @@ def main():
     ap.add_argument("--balance-by", nargs="+", default=None,
                     help="Column(s) to stratify the sample by (e.g. 'gender age_group')")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--min-chars", type=int, default=200,
+    ap.add_argument("--min-chars", type=int, default=501,
                     help="Skip posts shorter than this")
     ap.add_argument("--detectors", nargs="+", default=DEFAULT_DETECTORS)
     ap.add_argument("--api-delay", type=float, default=1.5)

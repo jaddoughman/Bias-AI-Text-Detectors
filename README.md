@@ -1,135 +1,85 @@
-# Bias in AI Text Detection Systems — Code
+# Bias in AI Text Detection Systems — code and per-text outputs
 
-This repository accompanies the manuscript *"Bias in AI Text Detection Systems"* (PLOS ONE). It provides the code used to (1) query five MGT detection systems over four corpora, (2) extract the 12 linguistic features used in the linguistic-mechanisms analysis, and (3) compute the fairness metrics reported in the paper.
+Code and data accompanying *"Algorithmic barriers to educational equity: Bias in AI text detection systems"* (Doughman & Khreich, PLOS ONE). This version of the repository corresponds to the **R5 revision** of the manuscript (November 2026). It contains
+
+1. the detector wrapper and the scripts used to query detectors on each corpus,
+2. the script used to re-run the locally run (open-source) detectors at pinned revisions,
+3. the analysis scripts that produce every table and figure in the R5 manuscript and its supporting information, and
+4. **per-text detector outputs** (text identifier, label and score for every detector) in `outputs/`, including the September 2025 outputs of the commercial detectors, which cannot be regenerated.
+
+License: MIT (see `LICENSE`).
+
+## Detectors
+
+| Detector | Identifier | Access | Status in the analysis |
+| --- | --- | --- | --- |
+| Originality.AI | `www.originality.ai` | free API (queried Sept 2025) | analysed |
+| GPTZero | `gptzero` | API key (queried Sept 2025) | analysed |
+| ZeroGPT | `www.zerogpt.com` | API (queried Sept 2025) | analysed |
+| Hello-SimpleAI | `Hello-SimpleAI/chatgpt-detector-roberta` | HF, rev `d2b342c6` | analysed |
+| Fakespot | `fakespot-ai/roberta-base-ai-text-detection-v1` | HF, rev `f9cdb14d` | analysed |
+| RoBERTa-large (OpenAI) | `openai-community/roberta-large-openai-detector` | HF, rev `38f3e0cc` | analysed (from R5) |
+| RADAR | `TrustSafeAI/RADAR-Vicuna-7B` | HF, rev `4ff1f23a` | analysed (from R5) |
+| e5-small-lora | `MayZhou/e5-small-lora-ai-generated-detector` | HF, rev `483fc496` | excluded (74.6% FPR > 60% rule) |
+| Binoculars | — | — | identified, not evaluated |
+
+Full revision hashes and the softmax index that each publisher designates as "AI-generated" are in `text_detector.py` (`HF_DETECTORS`) and in S5 Table. Three checkpoints (RoBERTa-large, RADAR, e5-small-lora) do not name their labels in `config.json`; the conventions come from the publishers' reference code (OpenAI `detector/server.py`: `fake, real = probs`; RADAR Space `app.py`: softmax index 0 = AI) or model card (e5: `Label_1` = AI).
+
+## Corrections in this version (R5)
+
+* **Hello-SimpleAI label lookup.** The previous `text_detector.py` read the Hello-SimpleAI score under `"LABEL_1"`, but the checkpoint's `config.json` names its labels `"Human"`/`"ChatGPT"`; that lookup returned 0 for every text. The study's runs did not use that code path: they used the pipeline label directly (the `else` branch of the original wrapper, reproduced in `score_local_detectors.py --mode original`). Re-running that wrapper reproduces 2,064 of the 2,078 published ICNALE labels and all 1,481 commonly scored Blog labels (S7 Table). The wrapper is fixed.
+* **Inputs longer than 512 tokens.** The 2025 wrapper truncated at `max_position_embeddings` (514), decoded, and re-tokenised without truncation, so any text of more than 512 tokens raised an error and was skipped. This removed 2 ICNALE essays and 519 Blog posts from the open-source results. All locally run detectors are now scored on every text with a single 512-token truncation.
+* **Excluded detectors.** `rerun_excluded_detectors.py` (August 2026) covered ICNALE only; `score_local_detectors.py` now runs all locally run detectors on all corpora.
+* **Corpus sampling defaults.** `run_detectors_on_arxiv.py` previously defaulted to 200 abstracts per field with a 1,500-character minimum, and `run_detectors_on_blogs.py` to balancing by gender and age with a 200-character minimum. Neither matched the study. The study used 90 abstracts per field with no minimum length (GPTZero on all 990; ZeroGPT, Originality.AI and the 2025 Hello-SimpleAI/Fakespot runs on the first 45 per field), and 2,000 blog posts longer than 500 characters, 1,000 per gender (age not balanced). The defaults and docstrings now say so, and the exact samples are identified in `outputs/`.
 
 ## Layout
 
 ```
-github/
-├── text_detector.py            # Unified wrapper around the six retained detectors
-├── linguistic_features.py      # The 12 lexical/syntactic/readability/structural features
-├── run_detectors_on_icnale.py  # ICNALE WEP pipeline (RQ1, RQ2)
-├── run_detectors_on_blogs.py   # Blog Authorship Corpus pipeline (RQ3)
-├── run_detectors_on_arxiv.py   # arXiv abstracts pipeline (RQ3)
-├── run_detectors_on_daigt.py   # DAIGT v2 AI-generated pipeline (§4.5 TPR / asymmetry)
-├── compute_bias_metrics.py     # FPR by group, bias range, Cohen's d, Separation Index
-└── requirements.txt
+text_detector.py           wrapper for all detectors (commercial APIs + pinned HF checkpoints)
+score_local_detectors.py   re-run HF detectors on a CSV of texts (modes: standard | original)
+linguistic_features.py     the 12 lexical/syntactic/readability/structural features
+run_detectors_on_*.py      corpus loaders used to query detectors (ICNALE, Blog, arXiv, DAIGT)
+analysis/                  scripts that produce every R5 table and figure from outputs/
+outputs/                   per-text outputs (see below)
+supplementary/             earlier supplementary CSVs (S4a/S4b/S5, R4)
 ```
 
-The five detectors covered, with the model identifier expected by `--detectors`:
+## Per-text outputs (`outputs/`)
 
-| Detector                                          | Identifier                                                   | Access            |
-| ------------------------------------------------- | ------------------------------------------------------------ | ----------------- |
-| Originality.AI                                    | `www.originality.ai`                                         | API, key required |
-| GPTZero                                           | `gptzero`                                                    | API, key required |
-| ZeroGPT                                           | `www.zerogpt.com`                                            | API, key required |
-| Hello-SimpleAI/chatgpt-detector-roberta           | `Hello-SimpleAI/chatgpt-detector-roberta`                    | HuggingFace local |
-| fakespot-ai/roberta-base-ai-text-detection-v1     | `fakespot-ai/roberta-base-ai-text-detection-v1`              | HuggingFace local |
+| File | Rows | Key | Notes |
+| --- | --- | --- | --- |
+| `icnale_outputs.csv` | 2,080 | ICNALE file name | country, CEFR, prompt, 12 features, label/score per detector. ICNALE texts are not redistributed (ICNALE terms of use); obtain the corpus from https://language.sakura.ne.jp/icnale/ and join on file name. |
+| `blog_outputs.csv` | 2,000 | post text | gender, age, label/score per detector |
+| `arxiv_outputs.csv` | 988 | arXiv identifier | field, label/score per detector |
+| `daigt_outputs.csv` | 1,000 | DAIGT v2 row id | 500 AI + 500 human essays |
+| `dactyl_outputs.csv` | 880 | DACTYL id | 2024–2025 generators, locally run detectors only |
+| `icnale_whitespace_outputs.csv` | 2,080 | ICNALE file name | line-break normalisation experiment |
 
-## Install
+For each detector: `<detector>_flag` (1 = classified AI-generated, 0 = human, empty = not scored) and `<detector>_score` (P(AI) for HF detectors; vendor score for commercial detectors). Commercial outputs are the September 2025 responses; texts the vendor did not score are empty, including GPTZero responses other than human/AI, which the collection script discarded (S8 Table).
+
+## Reproducing the R5 analysis
 
 ```bash
 pip install -r requirements.txt
+# 1. (optional) re-score texts with the locally run detectors at the pinned revisions
+#    (CPU is sufficient; about 3 texts/s for base models and 1 text/s for RoBERTa-large/RADAR)
+python score_local_detectors.py --input texts.csv --text-col Text --id-col text_id \
+    --detectors hello fakespot roberta_large radar e5 --mode standard --output scores.csv
+#    --mode original re-implements the 2025 wrapper (decode/re-encode at 514 tokens) for verification
+# 2. recompute the main tables and the conditional analyses from the per-text outputs
+cd analysis && python reproduce_tables.py
 ```
 
-The commercial detectors each require an API key exported in the environment:
-`GPTZERO_API_KEY`, `ORIGINALITY_API_KEY`, `ZEROGPT_API_KEY`.
+`analysis/reproduce_tables.py` recomputes the country, region, CEFR, Indian B2+, Blog and arXiv FPR tables (with Wilson intervals) and the conditional analyses of Section 4.4.3 directly from `outputs/`. `analysis/full_pipeline/` contains the scripts used to produce every table, supporting table and figure of the R5 manuscript from the per-text files and the raw re-run outputs (they expect the working layout `data/`, `runs/`, `tables/` used during the revision; `build_master.py` documents how the September 2025 result files were joined by text).
 
-## Datasets
+## Data sources
 
-The pipelines expect publicly available distributions of each corpus:
+* ICNALE Written Essays Plus v0.5 — https://language.sakura.ne.jp/icnale/ (registration required)
+* Blog Authorship Corpus — https://huggingface.co/datasets/barilan/blog_authorship_corpus
+* arXiv abstracts — https://huggingface.co/datasets/gfissore/arxiv-abstracts-2021
+* DAIGT v2 — https://www.kaggle.com/datasets/thedrcat/daigt-v2-train-dataset
+* DACTYL — https://huggingface.co/datasets/ShantanuT01/DACTYL (test split)
 
-- **ICNALE WEP** — request access at https://language.sakura.ne.jp/icnale/. The script consumes one-essay-per-file `.txt` files following the canonical naming convention `W_<CCC>_<PROMPT>_<NNN>_<CEFR>.txt`.
-- **Blog Authorship Corpus** — https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus (`blogtext.csv`).
-- **arXiv** — https://www.kaggle.com/datasets/Cornell-University/arxiv (metadata snapshot, CSV or JSONL).
-- **DAIGT v2** — https://www.kaggle.com/datasets/thedrcat/daigt-v2-train-dataset (`train_v2_drcat_02.csv`).
+## Software versions used for the R5 re-runs
 
-## Reproducing the paper's results
-
-### 1. False-positive audits on human-authored corpora (§4.1–§4.4)
-
-ICNALE — produces RQ1 (cross-cultural) and RQ2 (proficiency) tables:
-
-```bash
-python run_detectors_on_icnale.py \
-    --input-dir  /path/to/ICNALE_WEP/ \
-    --output     results/icnale.csv
-```
-
-Blog Authorship Corpus — RQ3 native-English-informal baseline:
-
-```bash
-python run_detectors_on_blogs.py \
-    --input  blogtext.csv \
-    --output results/blogs.csv \
-    --sample 2000 --balance-by gender age_group
-```
-
-arXiv abstracts — RQ3 academic-field bias:
-
-```bash
-python run_detectors_on_arxiv.py \
-    --input  arxiv-metadata-oai-snapshot.json \
-    --output results/arxiv.csv \
-    --per-field 200 --min-chars 1500
-```
-
-### 2. True-positive validation on AI-generated text (§4.5)
-
-```bash
-python run_detectors_on_daigt.py \
-    --input  train_v2_drcat_02.csv \
-    --output results/daigt_ai.csv \
-    --per-generator 100
-```
-
-### 3. Compute fairness metrics
-
-The bias-range and Cohen's-d tables are derived from the per-essay CSVs:
-
-```bash
-# RQ1 — Cross-country FPR + linguistic effect size
-python compute_bias_metrics.py --input results/icnale.csv \
-    --group-col Country --feature "Avg Word Length"
-
-# RQ2 — Proficiency
-python compute_bias_metrics.py --input results/icnale.csv \
-    --group-col Proficiency --feature "Avg Word Length"
-
-# RQ3 — Academic field
-python compute_bias_metrics.py --input results/arxiv.csv \
-    --group-col Academic_Field --feature "Flesch Reading Ease"
-
-# RQ3 — Blog gender / age
-python compute_bias_metrics.py --input results/blogs.csv \
-    --group-col Gender
-python compute_bias_metrics.py --input results/blogs.csv \
-    --group-col "Age Group"
-```
-
-## Output schema
-
-Every pipeline writes a CSV with one row per text and the same general shape:
-
-| Column                                | Source                                      |
-| ------------------------------------- | ------------------------------------------- |
-| Text                                  | Raw essay/post/abstract                     |
-| Demographic / field columns           | Country, Proficiency, Gender, Age Group, Academic_Field, Generator … |
-| Golden Label                          | Human or ChatGPT (DAIGT only)               |
-| 12 linguistic feature columns         | `linguistic_features.py`                    |
-| `<detector> Label`                    | Normalised to Human / ChatGPT               |
-| `<detector> Score`                    | P(AI) in [0, 1] (HF & Originality) or % (ZeroGPT) |
-| `<detector> Error`                    | Populated only on failure                   |
-
-This schema is what `compute_bias_metrics.py` consumes.
-
-## Reproducibility notes
-
-- All samplers use `random_state=42`.
-- HuggingFace detectors truncate input at the 512-token model maximum.
-- All detectors are evaluated at the 0.5 classification threshold.
-- Commercial detectors are rate-limited with `--api-delay` (default 1.5 s); checkpoints are written every 25 rows so a long run can be resumed.
-
-## License
-
-MIT.
+Python 3.13, torch 2.14 (CPU), transformers 4.46.3, tokenizers as installed with transformers 4.46.3, pandas 3.0, statsmodels 0.14, scikit-learn 1.x. The September 2025 runs were made from Jupyter notebooks (Python 3.9.6 according to the notebook metadata) with the library versions current at the time.

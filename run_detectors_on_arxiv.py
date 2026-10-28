@@ -4,7 +4,7 @@ Expects either:
   (a) a CSV with columns: id, categories, abstract  (Kaggle Cornell-University/arxiv export), OR
   (b) a JSONL with the same fields (one paper per line).
 
-A balanced sample is drawn (200 abstracts per primary category by default) and
+A balanced sample is drawn (90 abstracts per field by default, no minimum length) and
 each abstract is passed to every detector listed in --detectors. Output is a
 CSV with text + arXiv metadata + linguistic features + per-detector scores.
 
@@ -12,7 +12,15 @@ Example:
   python run_detectors_on_arxiv.py \\
       --input  arxiv-metadata-oai-snapshot.json \\
       --output results/arxiv.csv \\
-      --per-field 200 --min-chars 1500
+      --per-field 90 --min-chars 0
+
+The published study used 90 abstracts per field (990; the texts of two were not
+retained, leaving 988) with no minimum length. GPTZero was queried on all of them;
+ZeroGPT, Originality.AI and the 2025 Hello-SimpleAI/Fakespot runs used the first 45
+per field. Earlier versions of this file defaulted to 200 per field and a 1,500-
+character minimum, which did not match the study (see the manuscript, Section 3.1).
+The exact sample (arXiv identifiers) is in outputs/arxiv_outputs.csv; to re-score it,
+use score_local_detectors.py on those texts rather than re-sampling.
 """
 
 import argparse
@@ -78,8 +86,8 @@ def main():
     ap.add_argument("--id-col", default="id")
     ap.add_argument("--category-col", default="categories")
     ap.add_argument("--abstract-col", default="abstract")
-    ap.add_argument("--per-field", type=int, default=200, help="Abstracts sampled per field")
-    ap.add_argument("--min-chars", type=int, default=1500)
+    ap.add_argument("--per-field", type=int, default=90, help="Abstracts sampled per field")
+    ap.add_argument("--min-chars", type=int, default=0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--detectors", nargs="+", default=DEFAULT_DETECTORS)
     ap.add_argument("--api-delay", type=float, default=1.5)
