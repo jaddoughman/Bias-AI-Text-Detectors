@@ -41,14 +41,17 @@ supplementary/             earlier supplementary CSVs (S4a/S4b/S5, R4)
 
 | File | Rows | Key | Notes |
 | --- | --- | --- | --- |
-| `icnale_outputs.csv` | 2,080 | ICNALE file name | country, CEFR, prompt, 12 features, label/score per detector. ICNALE texts are not redistributed (ICNALE terms of use); obtain the corpus from https://language.sakura.ne.jp/icnale/ and join on file name. |
+| `icnale_outputs.csv` | 2,080 | ICNALE file name | country, CEFR, prompt, 12 features, `has_line_break`, label/score per detector. ICNALE texts are not redistributed (ICNALE terms of use); obtain the corpus from https://language.sakura.ne.jp/icnale/ and join on file name. |
+| `icnale_country_cefr_cells.csv` | 490 | country, CEFR, detector | every L2 country × CEFR cell (S3 Table) for the seven analysed detectors: `cell_size` (sampled essays), `scored`, `flagged`, `rate` (FPR, %), `wilson_lo`/`wilson_hi` (95% Wilson interval, %), `reportable` (scored ≥ 30) |
 | `blog_outputs.csv` | 2,000 | post text | gender, age, label/score per detector |
 | `arxiv_outputs.csv` | 988 | arXiv identifier | field, label/score per detector |
 | `daigt_outputs.csv` | 1,000 | DAIGT v2 row id | 500 AI + 500 human essays |
 | `dactyl_outputs.csv` | 880 | DACTYL id | 2024–2025 generators, locally run detectors only |
-| `icnale_whitespace_outputs.csv` | 2,080 | ICNALE file name | line-break normalisation experiment |
+| `icnale_whitespace_outputs.csv` | 2,080 | ICNALE file name | line-break normalisation experiment: outputs of the four locally run detectors after every whitespace run was replaced by a single space; `text_changed_by_normalisation` marks the 651 essays whose text changed |
 
 For each detector: `<detector>_flag` (1 = classified AI-generated, 0 = human, empty = not scored) and `<detector>_score` (P(AI) for HF detectors; vendor score for commercial detectors). Commercial outputs are the September 2025 responses; texts the vendor did not score are empty, including GPTZero responses other than human/AI, which the collection script discarded (S8 Table).
+
+`has_line_break` is 1 when the corpus text contains at least one newline (555 essays, all from Bangladesh, Cambodia, India, Laos, Malaysia, Myanmar, Nepal and Vietnam); these are the essays the line-break experiment (Section 4.4.1, S10 Table) compares. `Paragraph Count` > 1 is narrower (223 essays): it counts only blank-line breaks. The other 96 essays changed by normalisation contain repeated, tab, no-break or ideographic spaces but no line break.
 
 ## Reproducing the R5 analysis
 

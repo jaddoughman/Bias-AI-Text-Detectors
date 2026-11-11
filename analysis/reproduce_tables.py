@@ -73,6 +73,24 @@ def conditional(ic, d, B=1000, seed=7):
     return pd.DataFrame({'detector': d, 'quantity': names, 'pp': 100 * np.array(est), 'lo': 100 * lo, 'hi': 100 * hi})
 
 
+def line_breaks(ic, ws):
+    """Line-break experiment (Section 4.4.1, S10 Table). Locally run detectors: FPR before and after
+    whitespace normalisation for essays with and without line breaks. Commercial detectors (not
+    re-queried): FPR with and without line breaks within the countries whose essays contain any."""
+    lb = ic.has_line_break == 1
+    rows = []
+    for d in ['hello', 'fakespot', 'roberta_large', 'radar']:
+        for grp, m in (('with line breaks', lb), ('without line breaks', ~lb)):
+            rows.append({'detector': d, 'group': grp, 'n': int(m.sum()), 'fpr': 100 * ic.loc[m, f'{d}_flag'].mean(),
+                         'fpr_whitespace_normalised': 100 * ws.loc[m, f'{d}_flag_whitespace_normalised'].mean()})
+    aff = ic.Country.isin(ic.loc[lb, 'Country'].unique())
+    for d in ['originality', 'zerogpt', 'gptzero']:
+        for grp, m in (('affected countries, with line breaks', aff & lb), ('affected countries, without line breaks', aff & ~lb)):
+            s = ic.loc[m, f'{d}_flag'].dropna()
+            rows.append({'detector': d, 'group': grp, 'n': len(s), 'fpr': 100 * s.mean(), 'fpr_whitespace_normalised': np.nan})
+    return pd.DataFrame(rows)
+
+
 def main():
     os.makedirs(TAB, exist_ok=True)
     ic = pd.read_csv(os.path.join(OUTP, 'icnale_outputs.csv'))
@@ -84,6 +102,12 @@ def main():
     table(ic, 'Proficiency').to_csv(os.path.join(TAB, 'icnale_cefr.csv'), index=False)
     ib = ic[(ic.Country == 'India') & (ic.Proficiency == 'B2+')].assign(cell='India B2+')
     table(ib, 'cell').to_csv(os.path.join(TAB, 'india_b2.csv'), index=False)
+    cells = table(ic[ic.Proficiency != 'Native'], ['Country', 'Proficiency'], DETS[:7])
+    cells[cells.n > 0].to_csv(os.path.join(TAB, 'icnale_country_cefr_cells.csv'), index=False)
+    ws = pd.read_csv(os.path.join(OUTP, 'icnale_whitespace_outputs.csv'))
+    assert (ws.text_id == ic.text_id).all()
+    lb = line_breaks(ic, ws)
+    lb.to_csv(os.path.join(TAB, 'whitespace.csv'), index=False)
     table(bl, 'Gender').to_csv(os.path.join(TAB, 'blog_gender.csv'), index=False)
     table(bl, 'Age Group').to_csv(os.path.join(TAB, 'blog_age.csv'), index=False)
     table(ax, 'Academic_Field').to_csv(os.path.join(TAB, 'arxiv_field.csv'), index=False)
@@ -91,6 +115,7 @@ def main():
     cond.to_csv(os.path.join(TAB, 'conditional.csv'), index=False)
     c = table(ic, 'Country')
     print('Country FPR range (pp):', c.groupby('detector').fpr.agg(lambda x: round(x.max() - x.min(), 1)).to_dict())
+    print(lb.round(1).to_string(index=False))
     print(cond.round(1).to_string(index=False))
 
 

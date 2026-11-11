@@ -12,6 +12,8 @@ import zipfile
 
 import pandas as pd
 
+from common import NAMES, wilson
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 R = os.path.join(HERE, '..')
 OUT = os.path.join(R, 'S1_Dataset')
@@ -60,13 +62,37 @@ def daigt():
     return out
 
 
+def cells(ic):
+    """ICNALE country x CEFR cells (S3 Table) for the seven analysed detectors: flagged/scored, FPR and
+    95% Wilson interval, in %. Native speakers are excluded; cells a detector did not score are omitted."""
+    rows = []
+    for (c, p), sub in ic[ic.Proficiency != 'Native'].groupby(['Country', 'Proficiency']):
+        for d in COMM + ['hello', 'fakespot', 'roberta_large', 'radar']:
+            s = sub[f'{d}_flag'].dropna()
+            k, n = int(s.sum()), len(s)
+            if n == 0:
+                continue
+            lo, hi = wilson(k, n)
+            rows.append(dict(Country=c, CEFR=p, cell_size=len(sub), detector=NAMES[d], scored=n, flagged=k,
+                             rate=round(100 * k / n, 1), wilson_lo=round(100 * lo, 1), wilson_hi=round(100 * hi, 1),
+                             reportable=n >= 30))
+    return pd.DataFrame(rows)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     os.makedirs(GH, exist_ok=True)
     ic = build('icnale', ['text_id', 'filename', 'Country', 'Proficiency', 'prompt', 'gptzero_in_sample'] + FEATS, 'filename')
     ic = ic.rename(columns={'filename': 'icnale_file'})
     ic['Country'] = ic.Country.replace({'English Native Speakers': 'Native English'})
+    # has_line_break: the corpus text contains at least one newline (the line-break experiment's 555 essays).
+    # Paragraph Count > 1 is narrower: it counts only blank-line (double newline) breaks.
+    texts = pd.read_csv(os.path.join(R, 'data', 'icnale_master.csv'))
+    assert (texts.text_id.values == ic.text_id.values).all()
+    texts = texts.Text
+    ic.insert(ic.columns.get_loc(FEATS[-1]) + 1, 'has_line_break', texts.str.contains('\n').astype(int).values)
     files = {'icnale_outputs.csv': ic,
+             'icnale_country_cefr_cells.csv': cells(ic),
              'blog_outputs.csv': build('blog', ['text_id', 'Gender', 'Age', 'Age Group', 'Text'] + FEATS, 'text_id'),
              'arxiv_outputs.csv': build('arxiv', ['text_id', 'ArXiv_ID', 'Academic_Field', 'Text'] + FEATS, 'ArXiv_ID')}
     files['daigt_outputs.csv'] = daigt()
@@ -80,6 +106,11 @@ def main():
     if os.path.exists(wsf):
         ws = pd.read_csv(wsf)
         w = ic[['text_id', 'icnale_file', 'Country']].copy()
+        # 651 essays change under normalisation: the 555 with line breaks plus 96 with only repeated,
+        # tab, no-break or ideographic spaces. Unchanged essays keep their standard-mode outputs.
+        norm = pd.read_csv(os.path.join(R, 'data', 'icnale_texts_ws.csv'))
+        assert (norm.text_id.values == ic.text_id.values).all()
+        w['text_changed_by_normalisation'] = (norm.Text.values != texts.values).astype(int)
         for d in ['hello', 'fakespot', 'roberta_large', 'radar']:
             w[f'{d}_flag_whitespace_normalised'] = ws[f'{d}_pred_ai'].astype(bool).astype(int)
             w[f'{d}_score_whitespace_normalised'] = ws[f'{d}_p_ai'].round(6)
